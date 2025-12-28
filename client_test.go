@@ -13,16 +13,24 @@ import (
 
 // Test constants - these are NOT real credentials, only used for unit testing
 const (
-	testBaseURL   = "https://storage.example.com"
-	testAccessKey = "MOS_UNIT_TEST_FAKE_KEY" // #nosec - fake test value
-	testSecretKey = "unit_test_fake_secret"  // #nosec - fake test value
+	testBaseURL    = "https://storage.example.com"
+	testProjectID  = "550e8400-e29b-41d4-a716-446655440000"
+	testBucketName = "test-bucket"
+	testAccessKey  = "MOS_UNIT_TEST_FAKE_KEY" // #nosec - fake test value
+	testSecretKey  = "unit_test_fake_secret"  // #nosec - fake test value
 )
 
 func TestNewClient(t *testing.T) {
-	client := NewClient(testBaseURL, testAccessKey, testSecretKey)
+	client := NewClient(testBaseURL, testProjectID, testBucketName, testAccessKey, testSecretKey)
 
 	if client.BaseURL != testBaseURL {
 		t.Errorf("expected BaseURL %s, got %s", testBaseURL, client.BaseURL)
+	}
+	if client.ProjectID != testProjectID {
+		t.Errorf("expected ProjectID %s, got %s", testProjectID, client.ProjectID)
+	}
+	if client.BucketName != testBucketName {
+		t.Errorf("expected BucketName %s, got %s", testBucketName, client.BucketName)
 	}
 	if client.AccessKey != testAccessKey {
 		t.Errorf("expected AccessKey %s, got %s", testAccessKey, client.AccessKey)
@@ -33,7 +41,7 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestGenerateSignature(t *testing.T) {
-	client := NewClient(testBaseURL, testAccessKey, testSecretKey)
+	client := NewClient(testBaseURL, testProjectID, testBucketName, testAccessKey, testSecretKey)
 
 	method := "GET"
 	path := "/api/v1/projects/test-project/buckets/test-bucket/objects/test.jpg"
@@ -66,7 +74,7 @@ func TestGenerateSignature(t *testing.T) {
 }
 
 func TestGenerateSignature_MatchesAlgorithm(t *testing.T) {
-	client := NewClient(testBaseURL, testAccessKey, testSecretKey)
+	client := NewClient(testBaseURL, testProjectID, testBucketName, testAccessKey, testSecretKey)
 
 	method := "GET"
 	path := "/api/v1/projects/uuid/buckets/images/objects/photo.jpg"
@@ -86,7 +94,7 @@ func TestGenerateSignature_MatchesAlgorithm(t *testing.T) {
 }
 
 func TestGeneratePresignedURL(t *testing.T) {
-	client := NewClient(testBaseURL, testAccessKey, testSecretKey)
+	client := NewClient(testBaseURL, testProjectID, testBucketName, testAccessKey, testSecretKey)
 
 	path := "/api/v1/projects/test-project/buckets/test-bucket/objects/test.jpg"
 	expiresIn := time.Hour
@@ -116,7 +124,7 @@ func TestGeneratePresignedURL(t *testing.T) {
 }
 
 func TestGeneratePresignedURL_ValidURL(t *testing.T) {
-	client := NewClient(testBaseURL, testAccessKey, testSecretKey)
+	client := NewClient(testBaseURL, testProjectID, testBucketName, testAccessKey, testSecretKey)
 
 	path := "/api/v1/projects/test-project/buckets/test-bucket/objects/test.jpg"
 	presignedURL := client.GeneratePresignedURL("GET", path, time.Hour)
@@ -141,29 +149,24 @@ func TestGeneratePresignedURL_ValidURL(t *testing.T) {
 }
 
 func TestGetObjectURL(t *testing.T) {
-	client := NewClient(testBaseURL, testAccessKey, testSecretKey)
+	client := NewClient(testBaseURL, testProjectID, testBucketName, testAccessKey, testSecretKey)
 
-	projectID := "550e8400-e29b-41d4-a716-446655440000"
-	bucketName := "images"
 	filename := "photo.jpg"
 
-	resultURL := client.GetObjectURL(projectID, bucketName, filename, time.Hour)
+	resultURL := client.GetObjectURL(filename, time.Hour)
 
-	expectedPath := fmt.Sprintf("/api/v1/projects/%s/buckets/%s/objects/%s", projectID, bucketName, filename)
+	expectedPath := fmt.Sprintf("/api/v1/projects/%s/buckets/%s/objects/%s", testProjectID, testBucketName, filename)
 	if !strings.Contains(resultURL, expectedPath) {
 		t.Errorf("URL should contain correct path: %s", resultURL)
 	}
 }
 
 func TestUploadObjectURL(t *testing.T) {
-	client := NewClient(testBaseURL, testAccessKey, testSecretKey)
+	client := NewClient(testBaseURL, testProjectID, testBucketName, testAccessKey, testSecretKey)
 
-	projectID := "550e8400-e29b-41d4-a716-446655440000"
-	bucketName := "images"
+	resultURL := client.UploadObjectURL(time.Hour)
 
-	resultURL := client.UploadObjectURL(projectID, bucketName, time.Hour)
-
-	expectedPath := fmt.Sprintf("/api/v1/projects/%s/buckets/%s/objects", projectID, bucketName)
+	expectedPath := fmt.Sprintf("/api/v1/projects/%s/buckets/%s/objects", testProjectID, testBucketName)
 	if !strings.Contains(resultURL, expectedPath) {
 		t.Errorf("URL should contain correct path: %s", resultURL)
 	}
@@ -175,15 +178,13 @@ func TestUploadObjectURL(t *testing.T) {
 }
 
 func TestDeleteObjectURL(t *testing.T) {
-	client := NewClient(testBaseURL, testAccessKey, testSecretKey)
+	client := NewClient(testBaseURL, testProjectID, testBucketName, testAccessKey, testSecretKey)
 
-	projectID := "550e8400-e29b-41d4-a716-446655440000"
-	bucketName := "images"
 	filename := "photo.jpg"
 
-	resultURL := client.DeleteObjectURL(projectID, bucketName, filename, time.Hour)
+	resultURL := client.DeleteObjectURL(filename, time.Hour)
 
-	expectedPath := fmt.Sprintf("/api/v1/projects/%s/buckets/%s/objects/%s", projectID, bucketName, filename)
+	expectedPath := fmt.Sprintf("/api/v1/projects/%s/buckets/%s/objects/%s", testProjectID, testBucketName, filename)
 	if !strings.Contains(resultURL, expectedPath) {
 		t.Errorf("URL should contain correct path: %s", resultURL)
 	}
@@ -198,7 +199,7 @@ func TestDefaultOptions(t *testing.T) {
 }
 
 func TestExpiryTime(t *testing.T) {
-	client := NewClient(testBaseURL, testAccessKey, testSecretKey)
+	client := NewClient(testBaseURL, testProjectID, testBucketName, testAccessKey, testSecretKey)
 
 	path := "/api/v1/projects/test/buckets/test/objects/test.jpg"
 

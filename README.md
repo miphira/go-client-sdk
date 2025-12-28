@@ -125,21 +125,23 @@ import (
 )
 
 func main() {
-    // Load from environment variables (recommended)
+    // Create client with all configuration
     client := sdk.NewClient(
         os.Getenv("STORAGE_BASE_URL"),    // e.g., "https://storage.miphira.com"
+        os.Getenv("STORAGE_PROJECT_ID"),  // e.g., "550e8400-e29b-41d4-a716-446655440000"
+        os.Getenv("STORAGE_BUCKET"),      // e.g., "images"
         os.Getenv("STORAGE_ACCESS_KEY"),  // e.g., "MOS_xxxxxxxxxxxxxxxxxxxx"
         os.Getenv("STORAGE_SECRET_KEY"),  // e.g., "xxxxxxxxxxxxxxxxxxxxxxxx"
     )
 
-    // These values come from Steps 2 & 3 above
-    projectID := os.Getenv("STORAGE_PROJECT_ID")  // e.g., "550e8400-e29b-41d4-a716-446655440000"
-    bucketName := os.Getenv("STORAGE_BUCKET")     // e.g., "images"
+    // Generate presigned URLs - simple API!
+    downloadURL := client.GetObjectURL("photo.jpg", time.Hour)
+    uploadURL := client.UploadObjectURL(time.Hour)
+    deleteURL := client.DeleteObjectURL("photo.jpg", time.Hour)
 
-    // Generate a presigned URL for downloading a file (valid for 1 hour)
-    url := client.GetObjectURL(projectID, bucketName, "photo.jpg", time.Hour)
-
-    fmt.Println("Download URL:", url)
+    fmt.Println("Download:", downloadURL)
+    fmt.Println("Upload:", uploadURL)
+    fmt.Println("Delete:", deleteURL)
 }
 ```
 
@@ -156,18 +158,26 @@ STORAGE_SECRET_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
 
 ### NewClient
 
-Creates a new Object Storage client.
+Creates a new Object Storage client with all required configuration.
 
 ```go
-func NewClient(baseURL, accessKey, secretKey string) *Client
+func NewClient(baseURL, projectID, bucketName, accessKey, secretKey string) *Client
 ```
+
+| Parameter | Description |
+|-----------|-------------|
+| `baseURL` | Storage server URL |
+| `projectID` | Project UUID (from Step 2) |
+| `bucketName` | Bucket name (from Step 3) |
+| `accessKey` | API access key (from Step 4) |
+| `secretKey` | API secret key (from Step 4) |
 
 ### GetObjectURL
 
 Generates a presigned URL for downloading/viewing an object.
 
 ```go
-func (c *Client) GetObjectURL(projectID, bucketName, filename string, expiresIn time.Duration) string
+func (c *Client) GetObjectURL(filename string, expiresIn time.Duration) string
 ```
 
 **Required Permission:** `read`
@@ -177,7 +187,7 @@ func (c *Client) GetObjectURL(projectID, bucketName, filename string, expiresIn 
 Generates a presigned URL for uploading an object.
 
 ```go
-func (c *Client) UploadObjectURL(projectID, bucketName string, expiresIn time.Duration) string
+func (c *Client) UploadObjectURL(expiresIn time.Duration) string
 ```
 
 **Required Permission:** `write`
@@ -187,7 +197,7 @@ func (c *Client) UploadObjectURL(projectID, bucketName string, expiresIn time.Du
 Generates a presigned URL for deleting an object.
 
 ```go
-func (c *Client) DeleteObjectURL(projectID, bucketName, filename string, expiresIn time.Duration) string
+func (c *Client) DeleteObjectURL(filename string, expiresIn time.Duration) string
 ```
 
 **Required Permission:** `delete`
@@ -220,17 +230,14 @@ import (
 func main() {
     client := sdk.NewClient(
         os.Getenv("STORAGE_BASE_URL"),
+        os.Getenv("STORAGE_PROJECT_ID"),
+        os.Getenv("STORAGE_BUCKET"),
         os.Getenv("STORAGE_ACCESS_KEY"),
         os.Getenv("STORAGE_SECRET_KEY"),
     )
 
     // Generate presigned URL
-    url := client.GetObjectURL(
-        "550e8400-e29b-41d4-a716-446655440000",
-        "images",
-        "photo.jpg",
-        time.Hour,
-    )
+    url := client.GetObjectURL("photo.jpg", time.Hour)
 
     // Download the file
     resp, err := http.Get(url)
@@ -269,16 +276,14 @@ import (
 func main() {
     client := sdk.NewClient(
         os.Getenv("STORAGE_BASE_URL"),
+        os.Getenv("STORAGE_PROJECT_ID"),
+        os.Getenv("STORAGE_BUCKET"),
         os.Getenv("STORAGE_ACCESS_KEY"),
         os.Getenv("STORAGE_SECRET_KEY"),
     )
 
     // Generate presigned upload URL
-    url := client.UploadObjectURL(
-        "550e8400-e29b-41d4-a716-446655440000",
-        "images",
-        time.Hour,
-    )
+    url := client.UploadObjectURL(time.Hour)
 
     // Prepare file for upload
     filePath := "local_photo.jpg"
@@ -328,17 +333,14 @@ import (
 func main() {
     client := sdk.NewClient(
         os.Getenv("STORAGE_BASE_URL"),
+        os.Getenv("STORAGE_PROJECT_ID"),
+        os.Getenv("STORAGE_BUCKET"),
         os.Getenv("STORAGE_ACCESS_KEY"),
         os.Getenv("STORAGE_SECRET_KEY"),
     )
 
     // Generate presigned delete URL
-    url := client.DeleteObjectURL(
-        "550e8400-e29b-41d4-a716-446655440000",
-        "images",
-        "photo.jpg",
-        time.Hour,
-    )
+    url := client.DeleteObjectURL("photo.jpg", time.Hour)
 
     // Send DELETE request
     req, _ := http.NewRequest("DELETE", url, nil)

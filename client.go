@@ -13,25 +13,31 @@ import (
 
 // Client represents a Miphira Object Storage API client.
 type Client struct {
-	BaseURL   string
-	AccessKey string
-	SecretKey string
+	BaseURL    string
+	ProjectID  string
+	BucketName string
+	AccessKey  string
+	SecretKey  string
 }
 
-// NewClient creates a new Object Storage client.
+// NewClient creates a new Object Storage client with all required configuration.
 //
 // Example:
 //
 //	client := sdk.NewClient(
 //	    "https://storage.miphira.com",
-//	    "MOS_YourAccessKey12345678",
-//	    "your-secret-key-here",
+//	    "550e8400-e29b-41d4-a716-446655440000",  // Project ID
+//	    "images",                                 // Bucket Name
+//	    "MOS_YourAccessKey12345678",              // Access Key
+//	    "your-secret-key-here",                   // Secret Key
 //	)
-func NewClient(baseURL, accessKey, secretKey string) *Client {
+func NewClient(baseURL, projectID, bucketName, accessKey, secretKey string) *Client {
 	return &Client{
-		BaseURL:   baseURL,
-		AccessKey: accessKey,
-		SecretKey: secretKey,
+		BaseURL:    baseURL,
+		ProjectID:  projectID,
+		BucketName: bucketName,
+		AccessKey:  accessKey,
+		SecretKey:  secretKey,
 	}
 }
 
@@ -70,9 +76,9 @@ func (c *Client) GeneratePresignedURL(method, path string, expiresIn time.Durati
 //
 // Example:
 //
-//	url := client.GetObjectURL("project-uuid", "images", "photo.jpg", time.Hour)
-func (c *Client) GetObjectURL(projectID, bucketName, filename string, expiresIn time.Duration) string {
-	path := fmt.Sprintf("/api/v1/projects/%s/buckets/%s/objects/%s", projectID, bucketName, filename)
+//	url := client.GetObjectURL("photo.jpg", time.Hour)
+func (c *Client) GetObjectURL(filename string, expiresIn time.Duration) string {
+	path := fmt.Sprintf("/api/v1/projects/%s/buckets/%s/objects/%s", c.ProjectID, c.BucketName, filename)
 	return c.GeneratePresignedURL("GET", path, expiresIn)
 }
 
@@ -80,10 +86,10 @@ func (c *Client) GetObjectURL(projectID, bucketName, filename string, expiresIn 
 //
 // Example:
 //
-//	url := client.UploadObjectURL("project-uuid", "images", time.Hour)
+//	url := client.UploadObjectURL(time.Hour)
 //	// Use this URL with a multipart/form-data POST request
-func (c *Client) UploadObjectURL(projectID, bucketName string, expiresIn time.Duration) string {
-	path := fmt.Sprintf("/api/v1/projects/%s/buckets/%s/objects", projectID, bucketName)
+func (c *Client) UploadObjectURL(expiresIn time.Duration) string {
+	path := fmt.Sprintf("/api/v1/projects/%s/buckets/%s/objects", c.ProjectID, c.BucketName)
 	return c.GeneratePresignedURL("POST", path, expiresIn)
 }
 
@@ -91,9 +97,9 @@ func (c *Client) UploadObjectURL(projectID, bucketName string, expiresIn time.Du
 //
 // Example:
 //
-//	url := client.DeleteObjectURL("project-uuid", "images", "photo.jpg", time.Hour)
-func (c *Client) DeleteObjectURL(projectID, bucketName, filename string, expiresIn time.Duration) string {
-	path := fmt.Sprintf("/api/v1/projects/%s/buckets/%s/objects/%s", projectID, bucketName, filename)
+//	url := client.DeleteObjectURL("photo.jpg", time.Hour)
+func (c *Client) DeleteObjectURL(filename string, expiresIn time.Duration) string {
+	path := fmt.Sprintf("/api/v1/projects/%s/buckets/%s/objects/%s", c.ProjectID, c.BucketName, filename)
 	return c.GeneratePresignedURL("DELETE", path, expiresIn)
 }
 
