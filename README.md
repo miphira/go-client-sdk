@@ -11,44 +11,74 @@ A Go SDK for generating presigned URLs to interact with the Miphira Object Stora
 go get github.com/miphira/go-client-sdk
 ```
 
-## Quick Start
+## Prerequisites - Get Your Credentials
 
-```go
-package main
+Before using the SDK, you need to create a project, bucket, and API key via the REST API.
 
-import (
-    "fmt"
-    "time"
-    
-    sdk "github.com/miphira/go-client-sdk"
-)
+### Step 1: Sign In (Get JWT Token)
 
-func main() {
-    // Create client with your credentials
-    client := sdk.NewClient(
-        "https://storage.miphira.com",      // Base URL
-        "MOS_YourAccessKey12345678",        // Access Key
-        "your-secret-key-here",             // Secret Key
-    )
+```bash
+curl -X POST "https://storage.miphira.com/api/v1/auth/signin" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "your-email@example.com",
+    "password": "your-password"
+  }'
+```
 
-    // Generate a presigned URL for downloading a file (valid for 1 hour)
-    url := client.GetObjectURL(
-        "550e8400-e29b-41d4-a716-446655440000",  // Project ID
-        "images",                                 // Bucket name
-        "photo.jpg",                              // Filename
-        time.Hour,                                // Expiry duration
-    )
-
-    fmt.Println("Download URL:", url)
+Response:
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "user": { "id": "user-uuid", "email": "your-email@example.com" }
 }
 ```
 
-## Getting Your API Credentials
-
-### 1. Create an API Key via REST API
+### Step 2: Create a Project (Get Project ID)
 
 ```bash
-curl -X POST "https://storage.miphira.com/api/v1/projects/{projectId}/keys" \
+curl -X POST "https://storage.miphira.com/api/v1/projects" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-app",
+    "description": "My application storage"
+  }'
+```
+
+Response:
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",  <-- THIS IS YOUR PROJECT ID
+  "name": "my-app",
+  "description": "My application storage"
+}
+```
+
+### Step 3: Create a Bucket (Choose Bucket Name)
+
+```bash
+curl -X POST "https://storage.miphira.com/api/v1/projects/550e8400-e29b-41d4-a716-446655440000/buckets" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "images"
+  }'
+```
+
+Response:
+```json
+{
+  "id": "bucket-uuid",
+  "name": "images",  <-- THIS IS YOUR BUCKET NAME
+  "project_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+### Step 4: Create an API Key (Get Access Key & Secret Key)
+
+```bash
+curl -X POST "https://storage.miphira.com/api/v1/projects/550e8400-e29b-41d4-a716-446655440000/keys" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -57,30 +87,69 @@ curl -X POST "https://storage.miphira.com/api/v1/projects/{projectId}/keys" \
   }'
 ```
 
-**Response:**
+Response:
 ```json
 {
   "id": "key-uuid",
   "name": "my-app-key",
-  "access_key": "MOS_<your_access_key_here>",
-  "secret_key": "<your_secret_key_shown_only_once>",
+  "access_key": "MOS_xxxxxxxxxxxxxxxxxxxx",  <-- YOUR ACCESS KEY
+  "secret_key": "xxxxxxxxxxxxxxxxxxxxxxxx",  <-- YOUR SECRET KEY (SAVE IT!)
   "permissions": ["read", "write", "delete"],
-  "created_at": "2025-12-28T10:00:00Z",
   "warning": "Save the secret_key now. It cannot be retrieved later."
 }
 ```
 
-> **IMPORTANT:** Save the `secret_key` immediately! It is only shown once and cannot be retrieved later.
+> **IMPORTANT:** Save the `secret_key` immediately! It is only shown once.
 
-### 2. Store Credentials Securely
+### Summary - What You Need
+
+| Parameter | Where to Get | Example |
+|-----------|--------------|---------|
+| `baseURL` | Your server URL | `https://storage.miphira.com` |
+| `projectID` | Step 2 response `id` | `550e8400-e29b-41d4-a716-446655440000` |
+| `bucketName` | Step 3 request `name` | `images` |
+| `accessKey` | Step 4 response `access_key` | `MOS_xxxxxxxxxxxxxxxxxxxx` |
+| `secretKey` | Step 4 response `secret_key` | `xxxxxxxxxxxxxxxxxxxxxxxx` |
+
+## Quick Start
 
 ```go
-// Use environment variables (recommended)
-client := sdk.NewClient(
-    os.Getenv("STORAGE_BASE_URL"),
-    os.Getenv("STORAGE_ACCESS_KEY"),
-    os.Getenv("STORAGE_SECRET_KEY"),
+package main
+
+import (
+    "fmt"
+    "os"
+    "time"
+    
+    sdk "github.com/miphira/go-client-sdk"
 )
+
+func main() {
+    // Load from environment variables (recommended)
+    client := sdk.NewClient(
+        os.Getenv("STORAGE_BASE_URL"),    // e.g., "https://storage.miphira.com"
+        os.Getenv("STORAGE_ACCESS_KEY"),  // e.g., "MOS_xxxxxxxxxxxxxxxxxxxx"
+        os.Getenv("STORAGE_SECRET_KEY"),  // e.g., "xxxxxxxxxxxxxxxxxxxxxxxx"
+    )
+
+    // These values come from Steps 2 & 3 above
+    projectID := os.Getenv("STORAGE_PROJECT_ID")  // e.g., "550e8400-e29b-41d4-a716-446655440000"
+    bucketName := os.Getenv("STORAGE_BUCKET")     // e.g., "images"
+
+    // Generate a presigned URL for downloading a file (valid for 1 hour)
+    url := client.GetObjectURL(projectID, bucketName, "photo.jpg", time.Hour)
+
+    fmt.Println("Download URL:", url)
+}
+```
+
+**Environment variables (.env):**
+```bash
+STORAGE_BASE_URL=https://storage.miphira.com
+STORAGE_PROJECT_ID=550e8400-e29b-41d4-a716-446655440000
+STORAGE_BUCKET=images
+STORAGE_ACCESS_KEY=MOS_xxxxxxxxxxxxxxxxxxxx
+STORAGE_SECRET_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 ## API Reference
