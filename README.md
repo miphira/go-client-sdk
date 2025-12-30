@@ -18,7 +18,7 @@ Before using the SDK, you need to create a project, bucket, and API key via the 
 ### Step 1: Sign In (Get JWT Token)
 
 ```bash
-curl -X POST "https://storage.miphira.com/api/v1/auth/signin" \
+curl -X POST "https://storage.miphiraapis.com/api/v1/auth/signin" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "your-email@example.com",
@@ -37,7 +37,7 @@ Response:
 ### Step 2: Create a Project (Get Project ID)
 
 ```bash
-curl -X POST "https://storage.miphira.com/api/v1/projects" \
+curl -X POST "https://storage.miphiraapis.com/api/v1/projects" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -58,7 +58,7 @@ Response:
 ### Step 3: Create a Bucket (Choose Bucket Name)
 
 ```bash
-curl -X POST "https://storage.miphira.com/api/v1/projects/550e8400-e29b-41d4-a716-446655440000/buckets" \
+curl -X POST "https://storage.miphiraapis.com/api/v1/projects/550e8400-e29b-41d4-a716-446655440000/buckets" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -78,7 +78,7 @@ Response:
 ### Step 4: Create an API Key (Get Access Key & Secret Key)
 
 ```bash
-curl -X POST "https://storage.miphira.com/api/v1/projects/550e8400-e29b-41d4-a716-446655440000/keys" \
+curl -X POST "https://storage.miphiraapis.com/api/v1/projects/550e8400-e29b-41d4-a716-446655440000/keys" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -105,7 +105,7 @@ Response:
 
 | Parameter | Where to Get | Example |
 |-----------|--------------|---------|
-| `baseURL` | Your server URL | `https://storage.miphira.com` |
+| `baseURL` | Fixed API endpoint | `https://storage.miphiraapis.com` |
 | `projectID` | Step 2 response `id` | `550e8400-e29b-41d4-a716-446655440000` |
 | `bucketName` | Step 3 request `name` | `images` |
 | `accessKey` | Step 4 response `access_key` | `MOS_xxxxxxxxxxxxxxxxxxxx` |
@@ -127,7 +127,7 @@ import (
 func main() {
     // Create client with all configuration
     client := sdk.NewClient(
-        os.Getenv("STORAGE_BASE_URL"),    // e.g., "https://storage.miphira.com"
+        os.Getenv("STORAGE_BASE_URL"),    // e.g., "https://storage.miphiraapis.com"
         os.Getenv("STORAGE_PROJECT_ID"),  // e.g., "550e8400-e29b-41d4-a716-446655440000"
         os.Getenv("STORAGE_BUCKET"),      // e.g., "images"
         os.Getenv("STORAGE_ACCESS_KEY"),  // e.g., "MOS_xxxxxxxxxxxxxxxxxxxx"
@@ -147,7 +147,7 @@ func main() {
 
 **Environment variables (.env):**
 ```bash
-STORAGE_BASE_URL=https://storage.miphira.com
+STORAGE_BASE_URL=https://storage.miphiraapis.com
 STORAGE_PROJECT_ID=550e8400-e29b-41d4-a716-446655440000
 STORAGE_BUCKET=images
 STORAGE_ACCESS_KEY=MOS_xxxxxxxxxxxxxxxxxxxx
