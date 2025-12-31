@@ -190,6 +190,57 @@ func TestDeleteObjectURL(t *testing.T) {
 	}
 }
 
+func TestGetPublicObjectURL(t *testing.T) {
+	client := NewClient(testBaseURL, testProjectID, testBucketName, testAccessKey, testSecretKey)
+
+	filename := "photo.jpg"
+
+	resultURL := client.GetPublicObjectURL(filename)
+
+	// Verify URL format: {baseURL}/api/v1/public/projects/{projectId}/buckets/{bucketName}/{filename}
+	expectedURL := fmt.Sprintf("%s/api/v1/public/projects/%s/buckets/%s/%s",
+		testBaseURL, testProjectID, testBucketName, filename)
+
+	if resultURL != expectedURL {
+		t.Errorf("public URL mismatch:\nexpected: %s\ngot:      %s", expectedURL, resultURL)
+	}
+
+	// Verify it's a valid URL
+	parsed, err := url.Parse(resultURL)
+	if err != nil {
+		t.Errorf("generated URL should be valid: %v", err)
+	}
+
+	// Verify it doesn't contain signature parameters (public URL)
+	query := parsed.Query()
+	if query.Get("X-Mos-AccessKey") != "" {
+		t.Error("public URL should not contain X-Mos-AccessKey")
+	}
+	if query.Get("X-Mos-Expires") != "" {
+		t.Error("public URL should not contain X-Mos-Expires")
+	}
+	if query.Get("X-Mos-Signature") != "" {
+		t.Error("public URL should not contain X-Mos-Signature")
+	}
+
+	// Verify URL structure
+	if !strings.HasPrefix(resultURL, testBaseURL) {
+		t.Errorf("URL should start with base URL: %s", resultURL)
+	}
+	if !strings.Contains(resultURL, "/api/v1/public/projects/") {
+		t.Errorf("URL should contain /api/v1/public/projects/: %s", resultURL)
+	}
+	if !strings.Contains(resultURL, testProjectID) {
+		t.Errorf("URL should contain project ID: %s", resultURL)
+	}
+	if !strings.Contains(resultURL, testBucketName) {
+		t.Errorf("URL should contain bucket name: %s", resultURL)
+	}
+	if !strings.HasSuffix(resultURL, filename) {
+		t.Errorf("URL should end with filename: %s", resultURL)
+	}
+}
+
 func TestDefaultOptions(t *testing.T) {
 	opts := DefaultOptions()
 

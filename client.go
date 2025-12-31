@@ -103,6 +103,25 @@ func (c *Client) DeleteObjectURL(filename string, expiresIn time.Duration) strin
 	return c.GeneratePresignedURL("DELETE", path, expiresIn)
 }
 
+// GetPublicObjectURL generates a public URL for accessing an object without authentication.
+// This URL does not require signatures or expiration time and is accessible to anyone.
+//
+// Note: Public URLs only work in beta mode where all buckets are public.
+// In production, you should use presigned URLs with GetObjectURL() for secure access.
+//
+// Example:
+//
+//	url := client.GetPublicObjectURL("photo.jpg")
+//	// Returns: https://storage.example.com/api/v1/public/projects/{projectId}/buckets/{bucket}/photo.jpg
+func (c *Client) GetPublicObjectURL(filename string) string {
+	return fmt.Sprintf("%s/api/v1/public/projects/%s/buckets/%s/%s",
+		c.BaseURL,
+		c.ProjectID,
+		c.BucketName,
+		filename,
+	)
+}
+
 // PresignedURLOptions provides additional options for URL generation.
 type PresignedURLOptions struct {
 	ExpiresIn time.Duration

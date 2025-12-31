@@ -134,7 +134,11 @@ func main() {
         os.Getenv("STORAGE_SECRET_KEY"),  // e.g., "xxxxxxxxxxxxxxxxxxxxxxxx"
     )
 
-    // Generate presigned URLs - simple API!
+    // Option 1: Public URLs (Beta - no auth required)
+    publicURL := client.GetPublicObjectURL("photo.jpg")
+    fmt.Println("Public URL:", publicURL)
+
+    // Option 2: Presigned URLs (Secure - with expiration)
     downloadURL := client.GetObjectURL("photo.jpg", time.Hour)
     uploadURL := client.UploadObjectURL(time.Hour)
     deleteURL := client.DeleteObjectURL("photo.jpg", time.Hour)
@@ -153,6 +157,57 @@ STORAGE_BUCKET=images
 STORAGE_ACCESS_KEY=MOS_xxxxxxxxxxxxxxxxxxxx
 STORAGE_SECRET_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
 ```
+
+## Public URLs vs Presigned URLs
+
+### When to Use Public URLs
+
+**Public URLs** (`GetPublicObjectURL`) are best for:
+- ✅ **Beta/Development** - All buckets are public in beta mode
+- ✅ **CDN Integration** - Public assets served through CDN
+- ✅ **Static Assets** - Images, logos, public documents
+- ✅ **Simple Access** - No authentication required
+- ✅ **Permanent Links** - URLs never expire
+
+**Example:**
+```go
+// Generate public URL (works immediately, no expiration)
+url := client.GetPublicObjectURL("logo.png")
+// https://storage.miphiraapis.com/api/v1/public/projects/{id}/buckets/images/logo.png
+
+// Use in HTML, share publicly, embed in emails
+<img src="{url}" />
+```
+
+### When to Use Presigned URLs
+
+**Presigned URLs** (`GetObjectURL`, `UploadObjectURL`, `DeleteObjectURL`) are best for:
+- ✅ **Production** - Secure access control
+- ✅ **Private Files** - User data, documents, private media
+- ✅ **Time-Limited Access** - Temporary download/upload links
+- ✅ **Permission Control** - read/write/delete permissions
+- ✅ **Secure Operations** - Upload, delete operations
+
+**Example:**
+```go
+// Generate presigned URL (secure, expires after 1 hour)
+url := client.GetObjectURL("private-document.pdf", time.Hour)
+// https://storage.miphiraapis.com/api/v1/projects/{id}/buckets/docs/objects/private-document.pdf?X-Mos-AccessKey=...&X-Mos-Expires=...&X-Mos-Signature=...
+
+// Share with specific users, expires automatically
+```
+
+### Comparison Table
+
+| Feature | Public URL | Presigned URL |
+|---------|------------|---------------|
+| **Authentication** | None | HMAC-SHA256 signature |
+| **Expiration** | Never | Configurable (e.g., 1 hour) |
+| **Security** | Public access | Access-controlled |
+| **Use Case** | Static assets | Private files |
+| **Beta Mode** | ✅ Available | ✅ Available |
+| **Production** | Public buckets only | All buckets |
+| **URL Length** | Short | Long (with signature) |
 
 ## API Reference
 
@@ -202,6 +257,26 @@ func (c *Client) DeleteObjectURL(filename string, expiresIn time.Duration) strin
 
 **Required Permission:** `delete`
 
+### GetPublicObjectURL
+
+Generates a public URL for accessing an object without authentication. No signature or expiration required.
+
+```go
+func (c *Client) GetPublicObjectURL(filename string) string
+```
+
+**Note:** This only works in beta mode where all buckets are public. In production, use presigned URLs with `GetObjectURL()` for secure access.
+
+**Example:**
+```go
+// Generate public URL (no authentication required)
+publicURL := client.GetPublicObjectURL("photo.jpg")
+// Returns: https://storage.miphiraapis.com/api/v1/public/projects/550e8400-e29b-41d4-a716-446655440000/buckets/images/photo.jpg
+
+// Anyone can access this URL directly in a browser or with curl
+// curl https://storage.miphiraapis.com/api/v1/public/projects/{projectId}/buckets/{bucket}/photo.jpg
+```
+
 ### GeneratePresignedURL
 
 Low-level method to generate a presigned URL for any HTTP method and path.
@@ -212,7 +287,55 @@ func (c *Client) GeneratePresignedURL(method, path string, expiresIn time.Durati
 
 ## Complete Examples
 
-### Download a File
+### Access a File via Public URL
+
+```go
+package main
+
+import (
+    "fmt"
+    "io"
+    "net/http"
+    "os"
+
+    sdk "github.com/miphira/go-client-sdk"
+)
+
+func main() {
+    client := sdk.NewClient(
+        os.Getenv("STORAGE_BASE_URL"),
+        os.Getenv("STORAGE_PROJECT_ID"),
+        os.Getenv("STORAGE_BUCKET"),
+        os.Getenv("STORAGE_ACCESS_KEY"),
+        os.Getenv("STORAGE_SECRET_KEY"),
+    )
+
+    // Generate public URL (no authentication required)
+    publicURL := client.GetPublicObjectURL("photo.jpg")
+    fmt.Println("Public URL:", publicURL)
+
+    // Download the file (no authentication needed!)
+    resp, err := http.Get(publicURL)
+    if err != nil {
+        panic(err)
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode != http.StatusOK {
+        fmt.Printf("Failed to download: %s\n", resp.Status)
+        return
+    }
+
+    // Save to local file
+    file, _ := os.Create("downloaded_photo.jpg")
+    defer file.Close()
+    io.Copy(file, resp.Body)
+
+    fmt.Println("File downloaded successfully!")
+}
+```
+
+### Download a File (with Presigned URL)
 
 ```go
 package main
