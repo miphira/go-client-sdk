@@ -135,19 +135,22 @@ func main() {
     )
 
     // Option 1: Public URLs (Beta - no auth required)
-    publicURL := client.GetPublicObjectURL("photo.jpg")
+    // Note: Use filename from upload response (server-generated UUID)
+    publicURL := client.GetPublicObjectURL("8aabd7f7-1dbf-4ea4-8918-db66069746e7.jpg")
     fmt.Println("Public URL:", publicURL)
 
     // Option 2: Presigned URLs (Secure - with expiration)
-    downloadURL := client.GetObjectURL("photo.jpg", time.Hour)
+    downloadURL := client.GetObjectURL("8aabd7f7-1dbf-4ea4-8918-db66069746e7.jpg", time.Hour)
     uploadURL := client.UploadObjectURL(time.Hour)
-    deleteURL := client.DeleteObjectURL("photo.jpg", time.Hour)
+    deleteURL := client.DeleteObjectURL("8aabd7f7-1dbf-4ea4-8918-db66069746e7.jpg", time.Hour)
 
     fmt.Println("Download:", downloadURL)
     fmt.Println("Upload:", uploadURL)
     fmt.Println("Delete:", deleteURL)
 }
 ```
+
+**Important:** When you upload a file, the server generates a new UUID-based filename. Always use the `URL` field from the upload response (`FileResponse`) to get the correct URL with the server-generated filename.
 
 **Environment variables (.env):**
 ```bash
@@ -385,6 +388,7 @@ package main
 
 import (
     "bytes"
+    "encoding/json"
     "fmt"
     "io"
     "mime/multipart"
@@ -406,7 +410,7 @@ func main() {
     )
 
     // Generate presigned upload URL
-    url := client.UploadObjectURL(time.Hour)
+    uploadURL := client.UploadObjectURL(time.Hour)
 
     // Prepare file for upload
     filePath := "local_photo.jpg"
@@ -424,7 +428,7 @@ func main() {
     writer.Close()
 
     // Upload the file
-    req, _ := http.NewRequest("POST", url, body)
+    req, _ := http.NewRequest("POST", uploadURL, body)
     req.Header.Set("Content-Type", writer.FormDataContentType())
 
     resp, err := http.DefaultClient.Do(req)
@@ -434,7 +438,21 @@ func main() {
     defer resp.Body.Close()
 
     if resp.StatusCode == http.StatusCreated {
+        // Parse response to get the actual file URL with server-generated UUID
+        var fileResp sdk.FileResponse
+        if err := json.NewDecoder(resp.Body).Decode(&fileResp); err != nil {
+            panic(err)
+        }
+
         fmt.Println("File uploaded successfully!")
+        fmt.Printf("File ID: %s\n", fileResp.ID)
+        fmt.Printf("Original Name: %s\n", fileResp.OriginalName)
+        fmt.Printf("Size: %s\n", fileResp.SizeFormatted)
+        fmt.Printf("Public URL: %s\n", fileResp.URL)
+        // The URL contains the server-generated UUID filename, not your original filename!
+        // Example: https://storage.miphiraapis.com/api/v1/public/projects/{projectId}/buckets/images/8aabd7f7-1dbf-4ea4-8918-db66069746e7.jpg
+    } else {
+        fmt.Printf("Upload failed with status: %s\n", resp.Status)
     }
 }
 ```
@@ -496,12 +514,80 @@ func main() {
 | 401 | `invalid_signature` | Signature verification failed |
 | 403 | `permission_denied` | Missing required permission |
 
+## Important: Server-Generated Filenames
+
+### Understanding File URLs
+
+When you upload a file to Miphira Object Storage, **the server generates a new UUID-based filename** for security and uniqueness. This means:
+
+❌ **Wrong - Don't do this:**
+```go
+// Upload a file named "photo.jpg"
+uploadURL := client.UploadObjectURL(time.Hour)
+// ... upload the file ...
+
+// ERROR: This will NOT work! The server changed the filename!
+wrongURL := client.GetPublicObjectURL("photo.jpg")
+```
+
+✅ **Correct - Do this:**
+```go
+// Upload a file
+uploadURL := client.UploadObjectURL(time.Hour)
+// ... upload the file ...
+
+// Parse the response to get the actual filename
+var fileResp sdk.FileResponse
+json.NewDecoder(resp.Body).Decode(&fileResp)
+
+// Use the URL from the response (contains server-generated UUID filename)
+correctURL := fileResp.URL
+// Or extract the filename from fileResp.URL and use SDK methods
+```
+
+### Example Flow
+
+```go
+// Step 1: Upload file "my-photo.jpg"
+uploadURL := client.UploadObjectURL(time.Hour)
+// ... multipart upload ...
+
+// Step 2: Server responds with:
+// {
+//   "id": "8aabd7f7-1dbf-4ea4-8918-db66069746e7",
+//   "original_name": "my-photo.jpg",
+//   "url": "https://storage.miphiraapis.com/api/v1/public/projects/550e8400.../buckets/images/8aabd7f7-1dbf-4ea4-8918-db66069746e7.jpg"
+// }
+
+// Step 3: Store fileResp.URL in your database or use it directly
+// The filename is now: 8aabd7f7-1dbf-4ea4-8918-db66069746e7.jpg (NOT my-photo.jpg!)
+
+// Step 4: To access the file later, use the filename from the response
+publicURL := client.GetPublicObjectURL("8aabd7f7-1dbf-4ea4-8918-db66069746e7.jpg")
+```
+
+### Why Does This Happen?
+
+The server generates UUID filenames to:
+- ✅ **Prevent naming conflicts** - Multiple users can upload files with the same name
+- ✅ **Security** - Original filenames may contain sensitive information
+- ✅ **Consistency** - All files follow the same naming pattern
+- ✅ **Uniqueness** - Guaranteed unique identifiers across the system
+
+### What You Should Store
+
+After uploading, you should store in your database:
+- `fileResp.ID` - File ID for API operations
+- `fileResp.URL` - Complete URL (recommended - can be used directly)
+- `fileResp.OriginalName` - The original filename (for display purposes)
+
 ## Best Practices
 
 1. **Short expiry times** - Use the shortest practical expiry (e.g., 5-15 minutes for uploads)
 2. **Environment variables** - Never hardcode credentials in source code
 3. **Secure storage** - Store secret keys encrypted at rest
 4. **Rotate keys** - Regularly rotate API keys for security
+5. **Parse upload responses** - Always parse the `FileResponse` to get the actual file URL with UUID filename
 
 ## License
 

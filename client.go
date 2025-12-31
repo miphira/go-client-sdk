@@ -11,6 +11,22 @@ import (
 	"time"
 )
 
+// FileResponse represents the response returned by the API after uploading a file.
+// The URL field contains the actual public URL with the server-generated UUID filename.
+type FileResponse struct {
+	ID            string                 `json:"id"`
+	Name          string                 `json:"name"`
+	OriginalName  string                 `json:"original_name"`
+	Size          int64                  `json:"size"`
+	SizeFormatted string                 `json:"size_formatted"`
+	MimeType      string                 `json:"mime_type"`
+	BucketID      string                 `json:"bucket_id"`
+	URL           string                 `json:"url"` // This is the actual URL with server-generated UUID
+	Metadata      map[string]interface{} `json:"metadata"`
+	CreatedAt     string                 `json:"created_at"`
+	UpdatedAt     string                 `json:"updated_at"`
+}
+
 // Client represents a Miphira Object Storage API client.
 type Client struct {
 	BaseURL    string
