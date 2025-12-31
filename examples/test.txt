@@ -1,0 +1,3 @@
+Hello from Miphira Object Storage Go SDK!
+This is a test file to verify upload functionality.
+The server will generate a UUID-based filename for this file.

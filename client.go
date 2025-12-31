@@ -3,11 +3,18 @@
 package sdk
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -148,4 +155,251 @@ func DefaultOptions() PresignedURLOptions {
 	return PresignedURLOptions{
 		ExpiresIn: time.Hour,
 	}
+}
+
+// UploadOptions provides options for file upload operations.
+type UploadOptions struct {
+	Metadata  map[string]interface{} // Optional metadata to attach to the file
+	ExpiresIn time.Duration          // URL expiration time (default: 1 hour)
+}
+
+// Upload uploads a file from the local filesystem and returns the server response.
+// The returned FileResponse contains the actual URL with server-generated UUID filename.
+//
+// Example:
+//
+//	resp, err := client.Upload("photo.jpg", &sdk.UploadOptions{
+//	    Metadata: map[string]interface{}{"category": "profile"},
+//	    ExpiresIn: time.Hour,
+//	})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	fmt.Printf("File uploaded: %s\n", resp.URL)
+//	// Use resp.URL or extract filename from it
+func (c *Client) Upload(filePath string, opts *UploadOptions) (*FileResponse, error) {
+	// Set defaults
+	if opts == nil {
+		opts = &UploadOptions{ExpiresIn: time.Hour}
+	}
+	if opts.ExpiresIn == 0 {
+		opts.ExpiresIn = time.Hour
+	}
+
+	// Open file
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	// Create multipart form
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// Add file
+	part, err := writer.CreateFormFile("file", filepath.Base(filePath))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create form file: %w", err)
+	}
+	if _, err := io.Copy(part, file); err != nil {
+		return nil, fmt.Errorf("failed to copy file data: %w", err)
+	}
+
+	// Add metadata if provided
+	if opts.Metadata != nil {
+		metadataJSON, err := json.Marshal(opts.Metadata)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal metadata: %w", err)
+		}
+		writer.WriteField("metadata", string(metadataJSON))
+	}
+
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close multipart writer: %w", err)
+	}
+
+	// Generate presigned URL
+	uploadURL := c.UploadObjectURL(opts.ExpiresIn)
+
+	// Create request
+	req, err := http.NewRequest("POST", uploadURL, body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	// Send request
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check status
+	if resp.StatusCode != http.StatusCreated {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("upload failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	// Parse response
+	var fileResp FileResponse
+	if err := json.NewDecoder(resp.Body).Decode(&fileResp); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &fileResp, nil
+}
+
+// UploadBytes uploads file content from memory (byte slice) and returns the server response.
+// Useful for uploading generated content, images from memory, or data from other sources.
+//
+// Example:
+//
+//	data := []byte("Hello, World!")
+//	resp, err := client.UploadBytes("hello.txt", data, &sdk.UploadOptions{
+//	    Metadata: map[string]interface{}{"type": "text"},
+//	})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	fmt.Printf("File uploaded: %s\n", resp.URL)
+func (c *Client) UploadBytes(filename string, data []byte, opts *UploadOptions) (*FileResponse, error) {
+	// Set defaults
+	if opts == nil {
+		opts = &UploadOptions{ExpiresIn: time.Hour}
+	}
+	if opts.ExpiresIn == 0 {
+		opts.ExpiresIn = time.Hour
+	}
+
+	// Create multipart form
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// Add file
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create form file: %w", err)
+	}
+	if _, err := part.Write(data); err != nil {
+		return nil, fmt.Errorf("failed to write file data: %w", err)
+	}
+
+	// Add metadata if provided
+	if opts.Metadata != nil {
+		metadataJSON, err := json.Marshal(opts.Metadata)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal metadata: %w", err)
+		}
+		writer.WriteField("metadata", string(metadataJSON))
+	}
+
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close multipart writer: %w", err)
+	}
+
+	// Generate presigned URL
+	uploadURL := c.UploadObjectURL(opts.ExpiresIn)
+
+	// Create request
+	req, err := http.NewRequest("POST", uploadURL, body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	// Send request
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check status
+	if resp.StatusCode != http.StatusCreated {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("upload failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	// Parse response
+	var fileResp FileResponse
+	if err := json.NewDecoder(resp.Body).Decode(&fileResp); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &fileResp, nil
+}
+
+// Download downloads a file and saves it to the specified local path.
+// Uses the server-generated UUID filename to fetch the file.
+//
+// Example:
+//
+//	err := client.Download("8aabd7f7-1dbf-4ea4-8918-db66069746e7.jpg", "local_photo.jpg", time.Hour)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+func (c *Client) Download(filename string, localPath string, expiresIn time.Duration) error {
+	// Generate URL (use public URL in beta mode)
+	url := c.GetPublicObjectURL(filename)
+
+	// Download file
+	resp, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("failed to download file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("download failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	// Create local file
+	file, err := os.Create(localPath)
+	if err != nil {
+		return fmt.Errorf("failed to create local file: %w", err)
+	}
+	defer file.Close()
+
+	// Copy data
+	if _, err := io.Copy(file, resp.Body); err != nil {
+		return fmt.Errorf("failed to save file: %w", err)
+	}
+
+	return nil
+}
+
+// Delete deletes a file from storage using presigned URL.
+//
+// Example:
+//
+//	err := client.Delete("8aabd7f7-1dbf-4ea4-8918-db66069746e7.jpg", time.Hour)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+func (c *Client) Delete(filename string, expiresIn time.Duration) error {
+	// Generate presigned delete URL
+	url := c.DeleteObjectURL(filename, expiresIn)
+
+	// Create DELETE request
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Send request
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to delete file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("delete failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	return nil
 }

@@ -130,19 +130,21 @@ Response:
 
 ## Quick Start
 
+### Simple Upload and Get Public URL
+
 ```go
 package main
 
 import (
     "fmt"
+    "log"
     "os"
-    "time"
     
     sdk "github.com/miphira/go-client-sdk"
 )
 
 func main() {
-    // Create client with all configuration
+    // Create client
     client := sdk.NewClient(
         os.Getenv("STORAGE_BASE_URL"),    // e.g., "https://storage.miphiraapis.com"
         os.Getenv("STORAGE_PROJECT_ID"),  // e.g., "550e8400-e29b-41d4-a716-446655440000"
@@ -151,23 +153,25 @@ func main() {
         os.Getenv("STORAGE_SECRET_KEY"),  // e.g., "xxxxxxxxxxxxxxxxxxxxxxxx"
     )
 
-    // Option 1: Public URLs (Beta - no auth required)
-    // Note: Use filename from upload response (server-generated UUID)
-    publicURL := client.GetPublicObjectURL("8aabd7f7-1dbf-4ea4-8918-db66069746e7.jpg")
-    fmt.Println("Public URL:", publicURL)
+    // Upload file - SDK automatically parses response with UUID filename
+    resp, err := client.Upload("photo.jpg", nil)
+    if err != nil {
+        log.Fatal(err)
+    }
 
-    // Option 2: Presigned URLs (Secure - with expiration)
-    downloadURL := client.GetObjectURL("8aabd7f7-1dbf-4ea4-8918-db66069746e7.jpg", time.Hour)
-    uploadURL := client.UploadObjectURL(time.Hour)
-    deleteURL := client.DeleteObjectURL("8aabd7f7-1dbf-4ea4-8918-db66069746e7.jpg", time.Hour)
-
-    fmt.Println("Download:", downloadURL)
-    fmt.Println("Upload:", uploadURL)
-    fmt.Println("Delete:", deleteURL)
+    // Server response contains the actual URL with UUID filename
+    fmt.Printf("Uploaded!\n")
+    fmt.Printf("File ID: %s\n", resp.ID)
+    fmt.Printf("Original Name: %s\n", resp.OriginalName)
+    fmt.Printf("Public URL: %s\n", resp.URL)
+    // Example URL: https://storage.miphiraapis.com/api/v1/public/projects/{projectId}/buckets/images/8aabd7f7-1dbf-4ea4-8918-db66069746e7.jpg
+    
+    // ✅ CORRECT: Use resp.URL directly (contains server-generated UUID filename)
+    // ❌ WRONG: Don't use client.GetPublicObjectURL("photo.jpg") - will return 404!
 }
 ```
 
-**Important:** When you upload a file, the server generates a new UUID-based filename. Always use the `URL` field from the upload response (`FileResponse`) to get the correct URL with the server-generated filename.
+**Important:** The server generates a UUID-based filename (e.g., `8aabd7f7-1dbf-4ea4-8918-db66069746e7.jpg`) for every uploaded file. Always use `resp.URL` from the upload response, not your original filename!
 
 **Environment variables (.env):**
 ```bash
@@ -247,6 +251,84 @@ func NewClient(baseURL, projectID, bucketName, accessKey, secretKey string) *Cli
 | `accessKey` | API access key (from Step 4) |
 | `secretKey` | API secret key (from Step 4) |
 
+### Upload (Recommended)
+
+Uploads a file and returns the server response with URL containing UUID filename.
+
+```go
+func (c *Client) Upload(filePath string, opts *UploadOptions) (*FileResponse, error)
+```
+
+**Example:**
+```go
+resp, err := client.Upload("photo.jpg", &sdk.UploadOptions{
+    Metadata: map[string]interface{}{"category": "profile"},
+})
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println("Public URL:", resp.URL) // Contains server-generated UUID filename
+```
+
+**Required Permission:** `write`
+
+### UploadBytes (Recommended)
+
+Uploads file content from memory.
+
+```go
+func (c *Client) UploadBytes(filename string, data []byte, opts *UploadOptions) (*FileResponse, error)
+```
+
+**Example:**
+```go
+data := []byte("Hello, World!")
+resp, err := client.UploadBytes("hello.txt", data, nil)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Println("Public URL:", resp.URL)
+```
+
+**Required Permission:** `write`
+
+### Download (Recommended)
+
+Downloads a file to local filesystem.
+
+```go
+func (c *Client) Download(filename string, localPath string, expiresIn time.Duration) error
+```
+
+**Example:**
+```go
+// Use UUID filename from upload response
+err := client.Download("8aabd7f7-1dbf-4ea4-8918-db66069746e7.jpg", "local_photo.jpg", time.Hour)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+**Required Permission:** `read`
+
+### Delete (Recommended)
+
+Deletes a file from storage.
+
+```go
+func (c *Client) Delete(filename string, expiresIn time.Duration) error
+```
+
+**Example:**
+```go
+err := client.Delete("8aabd7f7-1dbf-4ea4-8918-db66069746e7.jpg", time.Hour)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+**Required Permission:** `delete`
+
 ### GetObjectURL
 
 Generates a presigned URL for downloading/viewing an object.
@@ -259,7 +341,7 @@ func (c *Client) GetObjectURL(filename string, expiresIn time.Duration) string
 
 ### UploadObjectURL
 
-Generates a presigned URL for uploading an object.
+Generates a presigned URL for uploading an object. Use `Upload()` method instead for easier implementation.
 
 ```go
 func (c *Client) UploadObjectURL(expiresIn time.Duration) string
@@ -269,7 +351,7 @@ func (c *Client) UploadObjectURL(expiresIn time.Duration) string
 
 ### DeleteObjectURL
 
-Generates a presigned URL for deleting an object.
+Generates a presigned URL for deleting an object. Use `Delete()` method instead for easier implementation.
 
 ```go
 func (c *Client) DeleteObjectURL(filename string, expiresIn time.Duration) string
