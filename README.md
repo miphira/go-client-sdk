@@ -3,7 +3,24 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/miphira/go-client-sdk.svg)](https://pkg.go.dev/github.com/miphira/go-client-sdk)
 [![Go Report Card](https://goreportcard.com/badge/github.com/miphira/go-client-sdk)](https://goreportcard.com/report/github.com/miphira/go-client-sdk)
 
-A Go SDK for generating presigned URLs to interact with the Miphira Object Storage API.
+A Go SDK for generating presigned URLs and public URLs to interact with the Miphira Object Storage API.
+
+## Features
+
+- ✅ **Public URLs** - Simple, permanent links for public assets (beta mode)
+- ✅ **Presigned URLs** - Secure, time-limited access with HMAC-SHA256 signatures
+- ✅ **Upload/Download/Delete** - Complete file lifecycle management
+- ✅ **Easy Integration** - Simple API, works out of the box
+- ✅ **Production Ready** - Comprehensive error handling, logging, and best practices
+
+## Documentation
+
+📚 **Comprehensive Guides:**
+
+- 🚀 **[Getting Started](docs/getting-started.md)** - Quick setup and your first upload/download
+- 📤 **[Upload Guide](docs/upload-guide.md)** - Detailed examples: metadata, folders, multiple files, progress tracking
+- 🔐 **[Public vs Presigned URLs](docs/public-vs-presigned.md)** - When to use each approach, security considerations
+- ⚡ **[Best Practices](docs/best-practices.md)** - Security, performance, error handling, production deployment
 
 ## Installation
 
@@ -588,6 +605,44 @@ After uploading, you should store in your database:
 3. **Secure storage** - Store secret keys encrypted at rest
 4. **Rotate keys** - Regularly rotate API keys for security
 5. **Parse upload responses** - Always parse the `FileResponse` to get the actual file URL with UUID filename
+
+## Documentation Index
+
+### Quick Links
+
+- 📖 **[Getting Started Guide](docs/getting-started.md)** - Set up and first examples
+  - Installation and prerequisites
+  - Getting credentials (project, bucket, API keys)
+  - Your first upload
+  - Your first download
+  - Common issues and troubleshooting
+
+- 📤 **[Upload Guide](docs/upload-guide.md)** - Complete upload examples
+  - Basic upload
+  - Upload with metadata
+  - Upload with folder organization
+  - Multiple file upload
+  - Upload from memory
+  - Progress tracking
+  - Error handling
+  - Understanding server response
+
+- 🔐 **[Public vs Presigned URLs](docs/public-vs-presigned.md)** - Choose the right approach
+  - Quick comparison table
+  - Public URLs explained
+  - Presigned URLs explained
+  - Use case scenarios
+  - Security considerations
+  - Performance comparison
+
+- ⚡ **[Best Practices](docs/best-practices.md)** - Production-ready patterns
+  - Security (credentials, access control, validation)
+  - Performance (client reuse, concurrency, streaming)
+  - Error handling (retry logic, graceful degradation)
+  - Resource management (cleanup, context usage)
+  - Production deployment
+  - Monitoring and logging
+  - Cost optimization
 
 ## License
 
